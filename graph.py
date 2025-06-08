@@ -115,14 +115,11 @@ class SimpleAgent:
 
     def chat(self, message: str, thread_id: str = "default") -> str:
         try:
-            # Create initial state
             initial_state = {"messages": [HumanMessage(content=message)]}
 
-            # Run the graph
             config = {"configurable": {"thread_id": thread_id}}
             result = self.agent.invoke(initial_state, config)
 
-            # Get the last message from the agent
             final_messages = result["messages"]
             agent_messages = [
                 msg for msg in final_messages if isinstance(msg, AIMessage)
