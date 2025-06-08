@@ -1,4 +1,5 @@
 from uuid import uuid4
+
 from graph import SimpleAgent
 
 from dotenv import load_dotenv

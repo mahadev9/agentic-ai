@@ -1,8 +1,16 @@
 import os
-from tools import get_current_time, calculator, weather_tool, web_search_tool
 from typing import List, Optional, TypedDict, Annotated, Dict, Any
 import operator
 import sqlite3
+
+from tools import (
+    get_current_time,
+    calculator,
+    weather_tool,
+    web_search_tool,
+    ingest_documents,
+    search_documents,
+)
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.constants import END
@@ -26,6 +34,8 @@ class SimpleAgent:
             calculator,
             weather_tool,
             web_search_tool,
+            ingest_documents,
+            search_documents,
         ]
         self.llm = self._setup_llm()
 
@@ -71,14 +81,31 @@ class SimpleAgent:
     def _call_model(self, state: AgentState) -> Dict[str, Any]:
         messages = state["messages"]
 
-        system_message = """You are a helpful AI assistant with access to multiple tools:
+        system_message = """You are a helpful AI assistant with access to multiple tools and a knowledge base:
 
+**SEARCH & INFORMATION TOOLS:**
 1. **google_search**: Search the web for current information
 2. **get_weather**: Get weather information for any location
-3. **calculator**: Perform mathematical calculations
-4. **get_current_time**: Get current date/time in any timezone
+3. **get_current_time**: Get current date/time in any timezone
 
-Use these tools when needed to provide accurate, helpful responses. Always explain your reasoning and provide context for the information you find."""
+**COMPUTATION TOOLS:**
+4. **calculator**: Perform mathematical calculations
+
+**KNOWLEDGE BASE (RAG) TOOLS:**
+6. **search_documents**: Search through ingested documents using semantic similarity
+8. **ingest_documents**: Add new documents to the knowledge base
+
+**RAG USAGE GUIDELINES:**
+- Use RAG tools when users ask about specific documents, files, or knowledge base content
+- For finding specific information use search_documents
+- Always cite sources when using document-based information
+- If no relevant documents are found, suggest using web search or inform about available documents
+
+**GENERAL APPROACH:**
+1. Determine if the query needs document-based knowledge (RAG) or external information (web search)
+2. Use appropriate tools to gather information
+3. Provide comprehensive, well-sourced answers
+4. Explain your reasoning and cite sources"""
 
         if not messages or not isinstance(messages[0], HumanMessage):
             messages = [HumanMessage(content=system_message)] + messages

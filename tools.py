@@ -3,6 +3,8 @@ import json
 import math
 from datetime import datetime, timezone
 
+from rag import AgenticRAG
+
 import pytz
 from langchain_google_community import GoogleSearchAPIWrapper
 from langchain_community.utilities import OpenWeatherMapAPIWrapper
@@ -44,7 +46,6 @@ def calculator(expression: str) -> str:
         JSON string with calculation result
     """
     try:
-        # Safe mathematical functions
         safe_dict = {
             "__builtins__": {},
             "abs": abs,
@@ -67,7 +68,6 @@ def calculator(expression: str) -> str:
             "factorial": math.factorial,
         }
 
-        # Evaluate the expression safely
         result = eval(expression, safe_dict)
 
         return json.dumps(
@@ -125,4 +125,82 @@ def get_current_time(timezone_name: str = "UTC") -> str:
                 "message": str(e),
                 "utc_fallback": datetime.now(timezone.utc).isoformat(),
             }
+        )
+
+
+rag_system = AgenticRAG()
+
+
+@tool
+def ingest_documents(file_path: str) -> str:
+    """
+    Ingest a document into the RAG system.
+
+    Args:
+        file_path: Path to the document file to be ingested (supports PDF, TXT, DOCX)
+
+    Returns:
+        JSON string with ingestion results
+    """
+    try:
+        results = rag_system.add_document(file_path)
+        return json.dumps(results, indent=2)
+    except Exception as e:
+        return json.dumps(
+            {
+                "error": "Document ingestion failed",
+                "message": str(e),
+                "file_path": file_path,
+            }
+        )
+
+
+@tool
+def search_documents(query: str, max_results: int = 4) -> str:
+    """
+    Search through ingested documents using semantic similarity.
+
+    Args:
+        query: Search query for finding relevant documents
+        max_results: Maximum number of results to return (default: 4)
+
+    Returns:
+        JSON string with search results and relevance scores
+    """
+    try:
+        results = rag_system.similarity_search_with_score(query, k=max_results)
+
+        if not results:
+            return json.dumps(
+                {
+                    "query": query,
+                    "message": "No relevant documents found. Try adding documents to the 'documents' folder.",
+                    "results": [],
+                }
+            )
+
+        formatted_results = []
+        for doc, score in results:
+            formatted_results.append(
+                {
+                    "content": doc.page_content,
+                    "metadata": doc.metadata,
+                    "relevance_score": float(score),
+                    "source": doc.metadata.get("source", "unknown"),
+                    "type": doc.metadata.get("type", "unknown"),
+                }
+            )
+
+        return json.dumps(
+            {
+                "query": query,
+                "total_results": len(formatted_results),
+                "results": formatted_results,
+            },
+            indent=2,
+        )
+
+    except Exception as e:
+        return json.dumps(
+            {"error": "Document search failed", "message": str(e), "query": query}
         )
