@@ -2,11 +2,12 @@ import os
 from tools import get_current_time, calculator, weather_tool, web_search_tool
 from typing import List, Optional, TypedDict, Annotated, Dict, Any
 import operator
+import sqlite3
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage
 
@@ -28,6 +29,9 @@ class SimpleAgent:
         ]
         self.llm = self._setup_llm()
 
+        os.makedirs("./db", exist_ok=True)
+        conn = sqlite3.connect("./db/agent_state.db", check_same_thread=False)
+        self.memory = SqliteSaver(conn)
         self.agent = self._create_graph()
 
     def _setup_llm(self):
@@ -53,8 +57,7 @@ class SimpleAgent:
 
         workflow.add_edge("tools", "agent")
 
-        memory = MemorySaver()
-        return workflow.compile(checkpointer=memory)
+        return workflow.compile(checkpointer=self.memory)
 
     def _should_continue(self, state: AgentState) -> str:
         messages = state["messages"]
